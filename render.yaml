@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: linkplease-assignment
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PSEUDOGRAM_API_KEY
+        sync: false
+      - key: DB_PATH
+        value: data/linkplease.db
+      - key: VERIFY_SIGNATURES
+        value: "true"
+      - key: PYTHON_VERSION
+        value: "3.11.12"
