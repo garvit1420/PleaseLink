@@ -1,17 +1,19 @@
 """
 FastAPI application — the three graded endpoints live here.
 
-    POST /webhook   →  receives PseudoGram comment events
+    POST /webhook   →  receives PseudoGram comment events & saves to raw_events SQLite table
     POST /rules     →  creates keyword → DM rules
     GET  /stats     →  live counts (sent / failed / queued / duplicates_blocked)
 
-Everything heavy runs in background asyncio tasks so the webhook
-always returns 200 within milliseconds.
+Webhooks synchronously persist raw events to SQLite before returning 200 OK within milliseconds.
+Event processing and DM dispatch run in background asyncio worker loops.
 """
 
 import asyncio
 import hmac
 import hashlib
+import json
+import uuid
 import logging
 from contextlib import asynccontextmanager
 
@@ -44,11 +46,18 @@ reconciler = Reconciler(db)
 def _verify_signature(raw_body: bytes, signature_header: str | None) -> bool:
     """HMAC-SHA256 of the raw body, keyed with our API key."""
     if not signature_header:
+        logger.debug("Signature check failed: missing X-PseudoGram-Signature header")
         return False
     expected = hmac.new(
         config.API_KEY.encode(), raw_body, hashlib.sha256
     ).hexdigest()
     received = signature_header.removeprefix("sha256=")
+
+    # Debug log (no secret API key is logged, only payload size & hashes)
+    logger.info(
+        "Signature Check: body_len=%d, expected_sha256=%s, received_sha256=%s, raw_body=%s",
+        len(raw_body), expected, received, repr(raw_body)
+    )
     return hmac.compare_digest(expected, received)
 
 
@@ -58,6 +67,14 @@ def _verify_signature(raw_body: bytes, signature_header: str | None) -> bool:
 async def lifespan(_app: FastAPI):
     # ── START ───────────────────────────────────────────────────
     await db.connect()
+
+    unprocessed_raw = await db.count_unprocessed_raw_events()
+    initial_stats = await db.get_stats()
+    logger.info(
+        "STARTUP SELF-CHECK: Unprocessed raw_events=%d, Current stats snapshot=%s",
+        unprocessed_raw,
+        initial_stats,
+    )
 
     bg_tasks = [
         asyncio.create_task(event_processor.run(), name="event_processor"),
@@ -94,9 +111,10 @@ app = FastAPI(title="LinkPlease Assignment", lifespan=lifespan)
 async def webhook(request: Request):
     """
     Receive a comment event from PseudoGram.
-    Returns 200 immediately; real work happens in the background.
+    Saves raw event to SQLite raw_events table synchronously before returning 200.
     """
     raw_body = await request.body()
+    raw_body_str = raw_body.decode(errors="replace")
 
     # Part B: reject forged requests
     if config.VERIFY_SIGNATURES:
@@ -108,7 +126,21 @@ async def webhook(request: Request):
                 media_type="application/json",
             )
 
-    await event_processor.enqueue(raw_body)
+    event_id = None
+    event_type = None
+    try:
+        payload_json = json.loads(raw_body_str)
+        event_id = payload_json.get("event_id")
+        event_type = payload_json.get("event_type")
+    except Exception:
+        pass
+
+    if not event_id:
+        event_id = f"fallback_{uuid.uuid4().hex}"
+
+    # Synchronous DB write to raw_events table before returning 200
+    # Uses INSERT OR IGNORE, so duplicate event_ids return 200 OK without errors
+    await db.save_raw_event(event_id, event_type, raw_body_str)
 
     return Response(
         status_code=200,

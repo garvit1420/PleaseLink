@@ -27,4 +27,7 @@ SENDER_POLL_INTERVAL: float = float(os.environ.get("SENDER_POLL_INTERVAL", "0.5"
 RECONCILE_INTERVAL: int = int(os.environ.get("RECONCILE_INTERVAL", "10"))  # seconds
 
 # ── Webhook ─────────────────────────────────────────────────────
-VERIFY_SIGNATURES: bool = os.environ.get("VERIFY_SIGNATURES", "true").lower() == "true"
+VERIFY_SIGNATURES: bool = os.environ.get(
+    "SIGNATURE_VERIFICATION_ENABLED",
+    os.environ.get("VERIFY_SIGNATURES", "true")
+).lower() == "true"

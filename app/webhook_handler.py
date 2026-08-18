@@ -1,10 +1,11 @@
 """
-Webhook event processor — runs as a single background consumer.
+Webhook event processor — runs as a single background consumer loop polling raw_events.
 
-Events arrive via an asyncio.Queue so the /webhook endpoint
-returns 200 instantly while processing happens here.
+Events are written to SQLite table `raw_events` synchronously before returning 200 OK.
+Processing happens here asynchronously in a durable background loop.
 
 Handles:
+  • raw_events DB polling & marking processed
   • event_id deduplication  (~8 % of events are redelivered)
   • comment.created → keyword matching → DM task creation
   • comment.deleted → cancel pending DMs (Part C)
@@ -24,45 +25,48 @@ logger = logging.getLogger(__name__)
 class EventProcessor:
     def __init__(self, db: Database):
         self.db = db
-        self.queue: asyncio.Queue[bytes] = asyncio.Queue()
         self._running = True
 
     # ── Public API ──────────────────────────────────────────────
 
-    async def enqueue(self, raw_body: bytes):
-        """Called from the webhook endpoint — non-blocking."""
-        await self.queue.put(raw_body)
-
     async def run(self):
-        """Main loop — consumes events from the queue one at a time."""
+        """Main background loop — polls unprocessed raw_events from SQLite."""
         logger.info("Event processor started")
         while self._running:
             try:
-                raw_body = await asyncio.wait_for(self.queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
-                continue
+                raw_events = await self.db.get_unprocessed_raw_events(limit=100)
+                if not raw_events:
+                    await asyncio.sleep(0.1)
+                    continue
 
-            try:
-                await self._process(raw_body)
+                for item in raw_events:
+                    if not self._running:
+                        break
+                    event_id = item["event_id"]
+                    raw_payload = item["raw_payload"]
+                    try:
+                        await self._process(event_id, raw_payload)
+                    except Exception:
+                        logger.exception("Failed to process event %s", event_id)
+                    finally:
+                        await self.db.mark_raw_event_processed(event_id)
+            except asyncio.CancelledError:
+                break
             except Exception:
-                logger.exception("Failed to process event")
+                logger.exception("Event processor loop error")
+                await asyncio.sleep(0.5)
 
     def stop(self):
         self._running = False
 
     # ── Internal ────────────────────────────────────────────────
 
-    async def _process(self, raw_body: bytes):
-        event = json.loads(raw_body)
-        event_id = event.get("event_id")
+    async def _process(self, event_id: str, raw_payload: str):
+        event = json.loads(raw_payload)
         event_type = event.get("event_type")
         data = event.get("data", {})
 
-        if not event_id:
-            logger.warning("Event missing event_id, skipping")
-            return
-
-        # ── Event-level dedup ───────────────────────────────────
+        # ── Event-level dedup check ──────────────────────────────
         if await self.db.is_event_processed(event_id):
             logger.debug("Duplicate event %s — skipped", event_id)
             return

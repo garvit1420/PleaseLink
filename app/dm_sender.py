@@ -74,7 +74,7 @@ class DMSender:
                 "X-API-Key": config.API_KEY,
                 "Content-Type": "application/json",
             },
-            timeout=30.0,
+            timeout=httpx.Timeout(10.0, connect=5.0),
         )
         self._running = True
 
@@ -113,6 +113,9 @@ class DMSender:
         # Wait for a rate-limit slot
         await self.rate_limiter.acquire()
 
+        # Idempotency key per attempt: task_key-v{retry_count}
+        idempotency_key = f"{task['idempotency_key']}-v{retry_count}"
+
         try:
             resp = await self.client.post(
                 "/v1/dm/send",
@@ -121,11 +124,11 @@ class DMSender:
                     "message": task["dm_message"],
                     "comment_id": task["comment_id"],
                 },
-                headers={"Idempotency-Key": task["idempotency_key"]},
+                headers={"Idempotency-Key": idempotency_key},
             )
-        except httpx.RequestError as exc:
-            # Network-level error — retry
-            logger.error("Network error sending DM (task %d): %s", task_id, exc)
+        except (httpx.RequestError, httpx.TimeoutException) as exc:
+            # Network or timeout error — retry
+            logger.error("Network/Timeout error sending DM (task %d): %s", task_id, exc)
             await self._schedule_retry(task_id, retry_count)
             return
 

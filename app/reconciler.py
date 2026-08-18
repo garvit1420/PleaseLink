@@ -26,7 +26,7 @@ class Reconciler:
         self.client = httpx.AsyncClient(
             base_url=config.BASE_URL,
             headers={"X-API-Key": config.API_KEY},
-            timeout=30.0,
+            timeout=httpx.Timeout(10.0, connect=5.0),
         )
         self._running = True
 
@@ -68,8 +68,8 @@ class Reconciler:
 
         try:
             resp = await self.client.get(f"/v1/dm/{dm_id}")
-        except httpx.RequestError as exc:
-            logger.warning("Network error checking dm %s: %s", dm_id, exc)
+        except (httpx.RequestError, httpx.TimeoutException) as exc:
+            logger.warning("Network/Timeout error checking dm %s: %s", dm_id, exc)
             return  # will retry next cycle
 
         if resp.status_code != 200:

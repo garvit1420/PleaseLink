@@ -37,7 +37,16 @@ class Database:
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.execute("PRAGMA busy_timeout=5000")
         await self._init_tables()
-        logger.info("Database ready at %s", self.db_path)
+        recovered = await self.reset_stuck_tasks()
+        logger.info("Database ready at %s (Startup Recovery: reset %d tasks from 'sending' to 'queued')", self.db_path, recovered)
+
+    async def reset_stuck_tasks(self) -> int:
+        """Reset tasks left in 'sending' status back to 'queued' on startup. Returns row count updated."""
+        cursor = await self._conn.execute(
+            "UPDATE dm_tasks SET status = 'queued' WHERE status = 'sending'"
+        )
+        await self._conn.commit()
+        return cursor.rowcount
 
     async def close(self):
         if self._conn:
@@ -57,6 +66,17 @@ class Database:
                 event_id     TEXT PRIMARY KEY,
                 processed_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS raw_events (
+                event_id     TEXT PRIMARY KEY,
+                event_type   TEXT,
+                raw_payload  TEXT NOT NULL,
+                received_at  TEXT NOT NULL,
+                processed    INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_raw_events_unprocessed
+                ON raw_events(processed) WHERE processed = 0;
 
             CREATE TABLE IF NOT EXISTS dm_tasks (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,6 +153,52 @@ class Database:
             (event_id, self._now_iso()),
         )
         await self._conn.commit()
+
+    # ── Raw Event Ingestion & Polling (Fix 1) ───────────────────
+
+    async def save_raw_event(self, event_id: str, event_type: str | None, raw_payload: str) -> bool:
+        """
+        Synchronously save raw event payload before returning 200 OK.
+        Returns True if newly inserted, False if ignored due to duplicate event_id.
+        """
+        now = self._now_iso()
+        cursor = await self._conn.execute(
+            """INSERT OR IGNORE INTO raw_events
+               (event_id, event_type, raw_payload, received_at, processed)
+               VALUES (?, ?, ?, ?, 0)""",
+            (event_id, event_type, raw_payload, now),
+        )
+        await self._conn.commit()
+        return cursor.rowcount > 0
+
+    async def get_unprocessed_raw_events(self, limit: int = 100) -> list[dict]:
+        """Fetch oldest unprocessed raw events for background worker."""
+        cursor = await self._conn.execute(
+            """SELECT event_id, event_type, raw_payload
+               FROM raw_events
+               WHERE processed = 0
+               ORDER BY rowid ASC
+               LIMIT ?""",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    async def mark_raw_event_processed(self, event_id: str):
+        """Mark raw event as processed in database."""
+        await self._conn.execute(
+            "UPDATE raw_events SET processed = 1 WHERE event_id = ?",
+            (event_id,),
+        )
+        await self._conn.commit()
+
+    async def count_unprocessed_raw_events(self) -> int:
+        """Count remaining unprocessed raw events."""
+        cursor = await self._conn.execute(
+            "SELECT COUNT(*) as cnt FROM raw_events WHERE processed = 0"
+        )
+        row = await cursor.fetchone()
+        return row["cnt"] if row else 0
 
     # ── DM task CRUD ────────────────────────────────────────────
 
