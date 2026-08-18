@@ -18,7 +18,7 @@ async def main():
     public_url = os.environ.get("PUBLIC_URL")
     print("1. Cleaning DB tables for clean 1-to-1 official simulation...")
     if public_url:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             print("   Waiting for Render to finish deploying (polling /debug/wipe)...")
             for _ in range(60):
                 try:
@@ -76,7 +76,7 @@ async def main():
 
     public_webhook_url = f"{public_url}/webhook"
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=120.0) as client:
         print("3. Creating rule 'PRICE' on target server...")
         r_rule = await client.post(f"{public_url}/rules", json={
             "keyword": "PRICE",
