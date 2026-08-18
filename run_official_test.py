@@ -15,17 +15,23 @@ from app.config import API_KEY
 MOCK_API_BASE = "https://pseudogram-api.onrender.com"
 
 async def main():
-    print("1. Cleaning local DB tables for clean 1-to-1 official simulation...")
-    if os.path.exists("data/linkplease.db"):
-        conn = sqlite3.connect("data/linkplease.db")
-        conn.execute("DELETE FROM rules;")
-        conn.execute("DELETE FROM raw_events;")
-        conn.execute("DELETE FROM processed_events;")
-        conn.execute("DELETE FROM dm_tasks;")
-        conn.execute("DELETE FROM deleted_comments;")
-        conn.execute("UPDATE counters SET value = 0;")
-        conn.commit()
-        conn.close()
+    public_url = os.environ.get("PUBLIC_URL")
+    print("1. Cleaning DB tables for clean 1-to-1 official simulation...")
+    if public_url:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            await client.delete(f"{public_url}/debug/wipe")
+            print("   Remote DB wiped on Render.")
+    else:
+        if os.path.exists("data/linkplease.db"):
+            conn = sqlite3.connect("data/linkplease.db")
+            conn.execute("DELETE FROM rules;")
+            conn.execute("DELETE FROM raw_events;")
+            conn.execute("DELETE FROM processed_events;")
+            conn.execute("DELETE FROM dm_tasks;")
+            conn.execute("DELETE FROM deleted_comments;")
+            conn.execute("UPDATE counters SET value = 0;")
+            conn.commit()
+            conn.close()
 
     public_url = os.environ.get("PUBLIC_URL")
     lt_proc = None

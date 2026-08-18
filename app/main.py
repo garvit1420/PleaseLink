@@ -171,3 +171,17 @@ async def create_rule(request: Request):
 async def stats():
     """Live counts — compared against PseudoGram server-side truth."""
     return await db.get_stats()
+
+
+# TEMP - REMOVE BEFORE SUBMISSION
+@app.delete("/debug/wipe")
+async def debug_wipe():
+    """Temporarily added to allow the test script to wipe the remote DB."""
+    async with db.execute("DELETE FROM rules;") as _: pass
+    async with db.execute("DELETE FROM raw_events;") as _: pass
+    async with db.execute("DELETE FROM processed_events;") as _: pass
+    async with db.execute("DELETE FROM dm_tasks;") as _: pass
+    async with db.execute("DELETE FROM deleted_comments;") as _: pass
+    async with db.execute("UPDATE counters SET value = 0;") as _: pass
+    await db.commit()
+    return {"status": "wiped"}
