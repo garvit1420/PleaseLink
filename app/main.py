@@ -49,7 +49,7 @@ def _verify_signature(raw_body: bytes, signature_header: str | None) -> bool:
         logger.debug("Signature check failed: missing X-PseudoGram-Signature header")
         return False
     expected = hmac.new(
-        config.API_KEY.encode(), raw_body, hashlib.sha256
+        config.SIGNATURE_SECRET.encode(), raw_body, hashlib.sha256
     ).hexdigest()
     received = signature_header.removeprefix("sha256=")
 
@@ -74,6 +74,12 @@ async def lifespan(_app: FastAPI):
         "STARTUP SELF-CHECK: Unprocessed raw_events=%d, Current stats snapshot=%s",
         unprocessed_raw,
         initial_stats,
+    )
+    logger.info(
+        "API KEY DIAGNOSTICS: len=%d, repr=%s, is_stripped=%s",
+        len(config.API_KEY),
+        repr(config.API_KEY),
+        config.API_KEY.strip() == config.API_KEY
     )
 
     bg_tasks = [

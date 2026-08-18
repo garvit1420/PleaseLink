@@ -10,9 +10,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import base64
+
 # ── PseudoGram API ──────────────────────────────────────────────
-API_KEY: str = os.environ.get("PSEUDOGRAM_API_KEY", "")
+API_KEY: str = os.environ.get("PSEUDOGRAM_API_KEY", "").strip()
 BASE_URL: str = os.environ.get("PSEUDOGRAM_BASE_URL", "https://pseudogram-api.onrender.com")
+
+SIGNATURE_SECRET = API_KEY
+if "." in API_KEY:
+    try:
+        b64_part = API_KEY.split(".")[0]
+        # Add padding if missing
+        b64_part += "=" * ((4 - len(b64_part) % 4) % 4)
+        SIGNATURE_SECRET = base64.b64decode(b64_part).decode("utf-8")
+    except Exception:
+        pass
 
 # ── Database ────────────────────────────────────────────────────
 DB_PATH: str = os.environ.get("DB_PATH", "data/linkplease.db")
