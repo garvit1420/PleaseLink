@@ -19,8 +19,19 @@ async def main():
     print("1. Cleaning DB tables for clean 1-to-1 official simulation...")
     if public_url:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            await client.delete(f"{public_url}/debug/wipe")
-            print("   Remote DB wiped on Render.")
+            print("   Waiting for Render to finish deploying (polling /debug/wipe)...")
+            for _ in range(60):
+                try:
+                    r = await client.delete(f"{public_url}/debug/wipe")
+                    if r.status_code == 200:
+                        print("   Remote DB wiped on Render.")
+                        break
+                except Exception:
+                    pass
+                await asyncio.sleep(5)
+            else:
+                print("ERROR: Deploy taking too long or /debug/wipe not found.")
+                return
     else:
         if os.path.exists("data/linkplease.db"):
             conn = sqlite3.connect("data/linkplease.db")

@@ -177,11 +177,11 @@ async def stats():
 @app.delete("/debug/wipe")
 async def debug_wipe():
     """Temporarily added to allow the test script to wipe the remote DB."""
-    async with db.execute("DELETE FROM rules;") as _: pass
-    async with db.execute("DELETE FROM raw_events;") as _: pass
-    async with db.execute("DELETE FROM processed_events;") as _: pass
-    async with db.execute("DELETE FROM dm_tasks;") as _: pass
-    async with db.execute("DELETE FROM deleted_comments;") as _: pass
-    async with db.execute("UPDATE counters SET value = 0;") as _: pass
-    await db.commit()
+    await db._conn.execute("DELETE FROM rules;")
+    await db._conn.execute("DELETE FROM raw_events;")
+    await db._conn.execute("DELETE FROM processed_events;")
+    await db._conn.execute("DELETE FROM dm_tasks;")
+    await db._conn.execute("DELETE FROM deleted_comments;")
+    await db._conn.execute("UPDATE counters SET value = 0;")
+    await db._conn.commit()
     return {"status": "wiped"}
