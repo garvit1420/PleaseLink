@@ -17,7 +17,8 @@ import uuid
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
+from pydantic import BaseModel
 
 from app import config
 from app.database import Database
@@ -171,3 +172,33 @@ async def create_rule(request: Request):
 async def stats():
     """Live counts — compared against PseudoGram server-side truth."""
     return await db.get_stats()
+
+class QueryRequest(BaseModel):
+    query: str
+
+# TEMP - REMOVE BEFORE SUBMISSION
+@app.delete("/debug/wipe")
+async def debug_wipe():
+    """Temporarily added to allow the test script to wipe the remote DB."""
+    await db._conn.execute("DELETE FROM rules;")
+    await db._conn.execute("DELETE FROM raw_events;")
+    await db._conn.execute("DELETE FROM processed_events;")
+    await db._conn.execute("DELETE FROM dm_tasks;")
+    await db._conn.execute("DELETE FROM deleted_comments;")
+    await db._conn.execute("UPDATE counters SET value = 0;")
+    await db._conn.commit()
+    return {"status": "wiped"}
+
+# TEMP - REMOVE BEFORE SUBMISSION
+@app.post("/debug/query")
+async def debug_query(req: QueryRequest):
+    """Temporarily added to allow reading internal DB state for verification tests."""
+    q = req.query.strip()
+    if not q.upper().startswith("SELECT"):
+        raise HTTPException(status_code=403, detail="Only SELECT statements are allowed for safety.")
+    
+    cursor = await db._conn.execute(req.query)
+    rows = await cursor.fetchall()
+    columns = [description[0] for description in cursor.description] if cursor.description else []
+    result = [dict(zip(columns, row)) for row in rows]
+    return {"rows": result}
