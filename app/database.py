@@ -141,6 +141,14 @@ class Database:
 
     # ── Event deduplication ─────────────────────────────────────
 
+    async def is_duplicate_task(self, user_id: str, rule_id: str) -> bool:
+        # Check if we already have a task for this user+rule that wasn't cancelled
+        cursor = await self._conn.execute(
+            "SELECT 1 FROM dm_tasks WHERE user_id = ? AND rule_id = ? AND status != 'cancelled'",
+            (user_id, rule_id),
+        )
+        return (await cursor.fetchone()) is not None
+
     async def is_event_processed(self, event_id: str) -> bool:
         cursor = await self._conn.execute(
             "SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)
@@ -310,8 +318,8 @@ class Database:
     async def cancel_pending_dms_for_comment(self, comment_id: str) -> int:
         """Cancel any DMs still queued / sending for a deleted comment."""
         cursor = await self._conn.execute(
-            "UPDATE dm_tasks SET status='cancelled', updated_at=? WHERE comment_id=? AND status IN ('queued','sending')",
-            (self._now_iso(), comment_id),
+            "DELETE FROM dm_tasks WHERE comment_id=? AND status IN ('queued','sending')",
+            (comment_id,),
         )
         await self._conn.commit()
         return cursor.rowcount
