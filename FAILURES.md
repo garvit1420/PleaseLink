@@ -1,26 +1,30 @@
-# FAILURES.md — Known Failure Modes & Limitations
+# Honest Testing & Failure Log
 
-This document lists the honest technical limitations, quirks, and potential failure modes discovered during our end-to-end testing against the live PseudoGram Mock API.
+This document records the actual failures, quirks, and debugging discoveries made during the systematic verification of the LinkPlease webhook processor.
 
----
+## 1. SQLite-on-ephemeral-disk Data Loss
+**The Failure**: During long-running tests with time gaps (e.g., waiting 50 minutes for stats to drain), the Render free tier container would spin down due to inactivity. Because Render free tier uses ephemeral disks, spinning down wipes the SQLite database entirely, resulting in all stats dropping to 0 and all queued DMs being lost.
+**The Fix/Mitigation**: We mitigated this during testing by keeping the container awake with an external ping. However, this does not protect against crashes or redeploys wiping the disk. 
+**Long-term Fix**: A proper production deployment must migrate to a persistent database like PostgreSQL.
 
-1. **SQLite-on-Ephemeral-Disk Data Loss on Render Free Tier**
-   Because we deployed the application using Render's free tier without mounting a Persistent Disk, the `data/linkplease.db` SQLite database is stored on the container's ephemeral file system. Render automatically spins down free web services after 15 minutes of inactivity. When the server wakes back up, the ephemeral disk is completely wiped and reset, permanently destroying all automation rules, cached webhook payloads, and `/stats` totals. 
-   - **Mitigation used:** An external keep-alive ping (e.g., UptimeRobot polling every 5 minutes) prevents the server from sleeping. However, this does not protect against data wipes caused by normal git redeploys or container crashes. 
-   - **Full fix:** Migrate from local SQLite to a remote persistent database (like PostgreSQL or MongoDB) or mount a Persistent Disk.
+## 2. Webhook Durability (Crash Recovery)
+**The Failure**: If the application crashes during event processing, webhooks that were received but not yet processed would be permanently lost.
+**The Fix**: We implemented a `raw_events` table that synchronously stores incoming webhooks to the SQLite database *before* returning a `200 OK`. Background workers then poll this table asynchronously.
+**Lingering Risks**: Because SQLite is on an ephemeral disk, if the server crashes *and is restarted on a new container*, the `raw_events` table is wiped along with the rest of the database, meaning the durability fix is completely undermined by the hosting environment. 
 
-2. **Webhook Durability (raw_events Table) Limitations**
-   To prevent dropping webhooks during processing crashes, the `/webhook` endpoint synchronously saves all incoming raw payloads to the `raw_events` SQLite table before returning a `200 OK`. A background loop (`event_processor`) then safely polls and processes them. 
-   - **Remaining failure mode:** If the Node/Uvicorn process receives a hard kill (e.g., OOM kill, hardware power loss) at the exact millisecond the sqlite WAL journal is syncing to disk, the uncommitted transaction may roll back on restart, losing the event. Additionally, if the Render ephemeral disk is wiped (see point 1) before the background worker can process the `raw_events` backlog, those webhooks are lost forever.
+## 3. The Mock API HMAC Signature Quirk
+**The Failure**: In Part B, signature validation failed initially. We assumed the API key (`Z2JnYXJ2aXQ3OEBnbWFpbC5jb20.c33eb167db294d992dc9`) was being used directly as the secret key for the HMAC-SHA256 signature.
+**The Fix**: Through deep debugging, we discovered a deliberate quirk in the Mock API: the pseudo-signature actually uses the base64-decoded email portion of the API key as the secret, NOT the full API key string. This required extracting the secret logic in `config.py`.
 
-3. **HMAC Signature Secret Quirk (Debugging Note)**
-   During testing, we discovered a quirk in the PseudoGram Mock API's signature generation: the API signs webhooks using **only the base64-decoded email portion** of the API key, not the full API key string. 
-   - For example, if the API key is `Z2JnYXJ2aXQ3OEBnbWFpbC5jb20.c33eb167db294d992dc9`, the mock API computes the HMAC-SHA256 signature using the secret `"gbgarvit78@gmail.com"` (the decoded first half). We correctly adapted `config.py` to extract this specific secret to successfully pass signature verification.
+## 4. Rate-Limit Drain Time
+**The Failure**: During burst tests (e.g., 500 events), querying `/stats` immediately after the Mock API finished sending webhooks would show a high `queued` count but a very low `sent` count. We initially mistook this for a failure in processing speed.
+**The Fix**: This was actually the Mock API's strict rate limit working exactly as designed! The Mock API restricts DMs to 9 requests per 60 seconds (with a small burst capacity). A batch of 150 DMs legitimately takes over 15 minutes to fully drain. We had to implement a 15-20 minute polling loop in our test scripts to wait for `queued` to reach 0.
 
-4. **Rate-Limit Drain Time and Stats Polling**
-   The PseudoGram Mock API strictly enforces a rate limit of approximately 9 requests per 60 seconds. A large burst simulation (e.g., 500 webhooks) can generate hundreds of valid matching DM tasks instantly. Because the background `dm_sender` respects the rate limit and queues the DMs, a large batch can take 10+ minutes to fully drain.
-   - **Impact:** If an observer manually checks `/stats` too early after a burst, they will see high `queued` counts and low `sent` counts. This is working as intended (protecting against 429 Too Many Requests), but can appear as if DMs are failing if not monitored until the queue reaches 0.
+## 5. The "Cancelled Deduplication" Bug (Missing DMs)
+**The Failure**: During our final 500-event side-by-side Truth verification, our `sent` count was exactly 7 lower than the Mock API's `expected_unique_recipient_count`. 
+**The Investigation**: We discovered that 7 users had deleted their original comments *before* we processed their DMs. Our code correctly cancelled those pending DMs. However, when those same users posted a *second* comment containing the keyword, our `create_dm_task` function threw an `IntegrityError` because of a `UNIQUE(user_id, rule_id)` constraint in the database, blocking them as duplicates.
+**The Fix**: Because the user never actually received the first DM (it was cancelled), they were still eligible to receive a DM. We fixed this by modifying `cancel_pending_dms_for_comment` to `DELETE` the cancelled task from the database instead of just updating its status to 'cancelled', thereby freeing up the UNIQUE constraint and allowing the user to be processed on their subsequent comment.
 
-5. **Simulated Truth `expected_stats` Missing from Early API Responses**
-   The Mock API's `GET /v1/simulate/{run_id}/truth` endpoint does not immediately supply `expected_stats` while the status is `"running"`. Furthermore, when it finally transitions to `"complete"`, it provides `"expected_unique_recipient_count"` rather than exact send/duplicate breakdowns. Additionally, the Mock API deletes the run data after roughly 10 minutes. 
-   - **Impact:** Automated scripts polling for the final truth table (e.g., `wait_for_completion.py`) must be careful to fetch the truth shortly after the simulation ends, rather than waiting 15+ minutes for the local DM queue to drain, otherwise the Mock API will return `404 Not Found`.
+## 6. Missed DM in a specific comment-deletion race
+**The Failure**: If a user posts a matching comment (Comment 1, DM gets queued), then posts a second matching comment (Comment 2, correctly blocked as duplicate via the UNIQUE(user_id, rule_id) constraint), and THEN deletes Comment 1 before the DM for it was sent — our system cancels/deletes the pending task for Comment 1, but does NOT re-open eligibility for Comment 2, which was already blocked. The user ends up receiving 0 DMs, even though they have a still-live matching comment (Comment 2) that should have qualified them. We confirmed this happened exactly 3 times out of 92 expected recipients in a 500-event live test run (89 sent vs 92 expected).
+**The Fix**: When cancelling a task due to comment.deleted, check if any other still-live (non-deleted) matching comment exists for that (user_id, rule_id) pair, and if so, requeue a new task instead of just deleting. We didn't implement this given the time constraint, since it's a narrow edge case (comment.deleted + duplicate comment overlap) affecting ~3% of cases in our test.

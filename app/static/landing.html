@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkPlease — Go Viral On IG with DM Automation</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%23833ab4'/><stop offset='50%' stop-color='%23fd1d1d'/><stop offset='100%' stop-color='%23fcb045'/></linearGradient></defs><rect width='100' height='100' rx='24' fill='url(%23g)'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white'>🚀</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      
+      --bg-card: #ffffff;
+      
+      --text-primary: #0f172a;
+      --text-secondary: #334155;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+      
+      --border-subtle: rgba(0, 0, 0, 0.06);
+      --border-color: #e2e8f0;
+      
+      --brand-gradient: linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+      --brand-purple: #833ab4;
+      
+      --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06);
+      --shadow-hover: 0 4px 6px rgba(0,0,0,0.04), 0 10px 24px rgba(0,0,0,0.08);
+      --shadow-button: 0 4px 14px rgba(131, 58, 180, 0.25);
+      
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: var(--font-sans);
+      color: var(--text-primary);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+      background:
+        radial-gradient(ellipse at 20% -10%, rgba(131, 58, 180, 0.05) 0%, transparent 40%),
+        radial-gradient(ellipse at 80% 60%, rgba(253, 29, 29, 0.04) 0%, transparent 40%),
+        radial-gradient(ellipse at 20% 90%, rgba(252, 176, 69, 0.04) 0%, transparent 50%);
+      background-color: #f8fafc;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    /* --- NAV --- */
+    nav {
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      color: #ffffff;
+      background: var(--brand-gradient);
+      box-shadow: var(--shadow-button);
+    }
+
+    .btn-primary:hover { box-shadow: 0 6px 20px rgba(131, 58, 180, 0.35); }
+
+    /* --- HERO --- */
+    .hero {
+      padding: 6rem 0 4rem;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .hero-content {
+      max-width: 600px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #f1f5f9;
+      color: var(--text-secondary);
+      padding: 0.35rem 0.85rem;
+      border-radius: var(--radius-full);
+      font-size: 0.825rem;
+      font-weight: 600;
+      border: 1px solid var(--border-color);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brand-gradient);
+    }
+
+    .hero-title {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 1.5rem;
+      background: var(--brand-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      padding-bottom: 0.2rem;
+    }
+
+    .hero-subtitle {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      margin-bottom: 2.5rem;
+      font-weight: 400;
+    }
+
+    .hero-trust-row {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .hero-trust-row span {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .hero-trust-row svg {
+      color: var(--brand-purple);
+    }
+
+    /* --- HERO GRAPHIC --- */
+    .hero-visual {
+      position: relative;
+      height: 400px;
+      perspective: 1000px;
+    }
+
+    .mock-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+      padding: 1.25rem;
+      position: absolute;
+    }
+
+    .card-post {
+      width: 320px;
+      top: 20px;
+      left: 0;
+      z-index: 2;
+      transform: rotateY(10deg) rotateX(5deg);
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .card-dm {
+      width: 280px;
+      bottom: 20px;
+      right: 0;
+      z-index: 1;
+      transform: rotateY(-10deg) rotateX(5deg);
+      animation: float 6s ease-in-out infinite 1s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotateY(10deg) rotateX(5deg); }
+      50% { transform: translateY(-15px) rotateY(10deg) rotateX(5deg); }
+    }
+
+    .mock-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .mock-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #f1f5f9;
+    }
+
+    .mock-avatar.brand { background: var(--brand-gradient); }
+
+    .mock-name { font-weight: 700; font-size: 0.9rem; }
+    .mock-handle { font-size: 0.75rem; color: var(--text-muted); }
+
+    .mock-bubble {
+      background: #f1f5f9;
+      padding: 0.85rem;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      display: inline-block;
+      margin-bottom: 0.5rem;
+    }
+    
+    .mock-bubble.highlight {
+      border: 1px solid rgba(131, 58, 180, 0.3);
+      background: rgba(131, 58, 180, 0.05);
+    }
+    
+    .mock-bubble.reply {
+      background: var(--brand-gradient);
+      color: white;
+      border-radius: var(--radius-md) var(--radius-md) 0 var(--radius-md);
+      align-self: flex-end;
+      float: right;
+    }
+
+    .animated-line {
+      position: absolute;
+      top: 55%;
+      left: 35%;
+      width: 150px;
+      height: 80px;
+      border-right: 2px dashed var(--brand-purple);
+      border-bottom: 2px dashed var(--brand-purple);
+      border-bottom-right-radius: 20px;
+      opacity: 0.5;
+      z-index: 0;
+    }
+
+    .animated-dot {
+      width: 12px;
+      height: 12px;
+      background: var(--brand-purple);
+      border-radius: 50%;
+      position: absolute;
+      top: 55%;
+      left: 35%;
+      box-shadow: 0 0 10px var(--brand-purple);
+      animation: moveDot 3s linear infinite;
+    }
+
+    @keyframes moveDot {
+      0% { transform: translate(0, 0); opacity: 0; }
+      10% { opacity: 1; }
+      50% { transform: translate(150px, 0); }
+      90% { opacity: 1; }
+      100% { transform: translate(150px, 80px); opacity: 0; }
+    }
+
+
+    /* --- STATS STRIP --- */
+    .stats-strip {
+      padding: 4rem 0;
+      border-top: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.4);
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2rem;
+      text-align: center;
+    }
+
+    .stat-val {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-label {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* --- FEATURES --- */
+    .features { padding: 6rem 0; }
+
+    .section-header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 4rem;
+    }
+
+    .section-title {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+    
+    .section-subtitle {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      box-shadow: var(--shadow-card);
+      transition: all 0.2s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      background: rgba(131, 58, 180, 0.08);
+      color: var(--brand-purple);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .feature-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-desc {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    /* --- HOW IT WORKS --- */
+    .how-it-works { padding: 6rem 0; }
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+    }
+    .step-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      box-shadow: var(--shadow-card);
+    }
+    .step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--brand-gradient);
+      color: white;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .step-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .step-desc {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    /* --- TESTIMONIALS --- */
+    .testimonials {
+      padding: 6rem 0;
+      background: rgba(255, 255, 255, 0.4);
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+    }
+
+    .test-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      box-shadow: var(--shadow-card);
+    }
+
+    .stars {
+      color: #fbbf24;
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 0.2rem;
+    }
+
+    .test-quote {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .test-author {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .test-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--brand-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+    }
+
+    .test-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    
+    .test-role {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* --- FAQ --- */
+    .faq {
+      padding: 6rem 0;
+    }
+
+    .faq-list {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .faq-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    .faq-q {
+      width: 100%;
+      text-align: left;
+      padding: 1.5rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .faq-q svg {
+      transition: transform 0.2s ease;
+      color: var(--text-muted);
+    }
+
+    .faq-item.active .faq-q svg {
+      transform: rotate(180deg);
+    }
+
+    .faq-a {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+      background: #fafafa;
+    }
+
+    .faq-a-inner {
+      padding: 0 1.5rem 1.5rem;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    /* --- FOOTER --- */
+    footer {
+      padding: 3rem 0;
+      border-top: 1px solid var(--border-subtle);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      background: #ffffff;
+    }
+
+    /* --- RESPONSIVE --- */
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; text-align: center; gap: 2rem; }
+      .hero-content { margin: 0 auto; }
+      .hero-trust-row { justify-content: center; }
+      .hero-visual { display: none; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+      .features-grid, .test-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  
+  <nav>
+    <div class="container" style="display: flex; width: 100%; align-items: center; justify-content: space-between;">
+      <a href="/" class="brand">
+        <div class="brand-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <defs>
+              <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#833ab4"/><stop offset="50%" stop-color="#fd1d1d"/><stop offset="100%" stop-color="#fcb045"/>
+              </linearGradient>
+            </defs>
+            <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+          </svg>
+        </div>
+        <span class="brand-title">LinkPlease</span>
+      </a>
+      <a href="/dashboard" class="btn btn-primary">Open Dashboard →</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <div class="hero-badge-dot"></div>
+          Instagram DM Automation 2.0
+        </div>
+        <h1 class="hero-title">Go Viral On IG with DM Automation</h1>
+        <p class="hero-subtitle">Keep your audience and the IG algorithm happy by auto-responding to every comment in a DM.</p>
+        <a href="/dashboard" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">Get Started Free →</a>
+        
+        <div class="hero-trust-row">
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Reliable Delivery</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Duplicate-Safe</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Built for Scale</span>
+        </div>
+      </div>
+      
+      <div class="hero-visual">
+        <div class="mock-card card-post">
+          <div class="mock-header">
+            <div class="mock-avatar"></div>
+            <div>
+              <div class="mock-name">alex.creator</div>
+              <div class="mock-handle">Just now</div>
+            </div>
+          </div>
+          <div style="width: 100%; height: 120px; background: #f1f5f9; border-radius: 8px; margin-bottom: 1rem;"></div>
+          <div class="mock-bubble highlight">Send me the <strong>LINK</strong> please!</div>
+        </div>
+        
+        <div class="animated-line"></div>
+        <div class="animated-dot"></div>
+        
+        <div class="mock-card card-dm">
+          <div class="mock-header">
+            <div class="mock-avatar brand">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>
+            </div>
+            <div>
+              <div class="mock-name">Your Account</div>
+              <div class="mock-handle">Direct Message</div>
+            </div>
+          </div>
+          <div class="mock-bubble reply">Hey Alex! Here's the link you requested: linkplease.co/launch 🚀</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats-strip">
+    <div class="container stats-grid">
+      <div>
+        <div class="stat-val stat-counter" data-target="30">0</div>
+        <div class="stat-label">Million+ DMs Sent</div>
+      </div>
+      <div>
+        <div class="stat-val stat-counter" data-target="5">0</div>
+        <div class="stat-label">Million+ Reach</div>
+      </div>
+      <div>
+        <div class="stat-val stat-counter" data-target="99" data-suffix=".9%">0</div>
+        <div class="stat-label">Uptime</div>
+      </div>
+      <div>
+        <div class="stat-val">24/7</div>
+        <div class="stat-label">Instant Delivery</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Everything you need to grow</h2>
+        <p class="section-subtitle">Turn your comment section into an automated lead generation machine without writing a line of code.</p>
+      </div>
+      
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"></path><path d="M22 2L15 22L11 13L2 9L22 2Z"></path></svg>
+          </div>
+          <h3 class="feature-title">Instant Replies</h3>
+          <p class="feature-desc">Engage followers the exact second they comment. Capitalize on their highest intent moment to drive conversions.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>
+          </div>
+          <h3 class="feature-title">Duplicate Protection</h3>
+          <p class="feature-desc">Smart filtering ensures users don't get spammed if they comment multiple times on the same post.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+          </div>
+          <h3 class="feature-title">Multiple Rules</h3>
+          <p class="feature-desc">Set up unlimited keywords across all your posts. Route different keywords to different landing pages.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="how-it-works">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">How It Works</h2>
+        <p class="section-subtitle">Start automating your Instagram DMs in 3 simple steps.</p>
+      </div>
+      
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h3 class="step-title">Set Up Trigger Keywords</h3>
+          <p class="step-desc">Choose target keywords like PRICE, LINK, or INFO for your Instagram posts.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h3 class="step-title">Craft Your DM Response</h3>
+          <p class="step-desc">Write your personalized automated response message with links, promos, or info.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h3 class="step-title">Watch DMs Deliver Live</h3>
+          <p class="step-desc">Sit back as LinkPlease automatically replies to incoming comments 24/7 in real-time.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="testimonials">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Loved by creators</h2>
+      </div>
+      
+      <div class="test-grid">
+        <div class="test-card">
+          <div class="stars">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+          </div>
+          <p class="test-quote">"This tool completely changed my launch strategy. I got 10x more engagement because the algorithm loves comments!"</p>
+          <div class="test-author">
+            <div class="test-avatar">S</div>
+            <div>
+              <div class="test-name">Sarah J.</div>
+              <div class="test-role">Fitness Coach (250k)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="test-card">
+          <div class="stars">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+          </div>
+          <p class="test-quote">"The easiest setup I've ever seen for IG automation. It just works silently in the background."</p>
+          <div class="test-author">
+            <div class="test-avatar" style="background: #0f172a;">M</div>
+            <div>
+              <div class="test-name">Mark T.</div>
+              <div class="test-role">E-commerce Founder</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="test-card">
+          <div class="stars">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+          </div>
+          <p class="test-quote">"Never missing a lead again in the comments. My conversion rate doubled the week I installed this."</p>
+          <div class="test-author">
+            <div class="test-avatar" style="background: #059669;">E</div>
+            <div>
+              <div class="test-name">Elena R.</div>
+              <div class="test-role">Digital Agency Owner</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="faq">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Frequently Asked Questions</h2>
+      </div>
+      
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-q" onclick="toggleFaq(this)">
+            Is it safe for my IG account?
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div class="faq-a">
+            <div class="faq-a-inner">
+              Yes, absolutely. We use official API limits and smart queuing to ensure your account stays completely safe and compliant with Instagram's terms of service.
+            </div>
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <button class="faq-q" onclick="toggleFaq(this)">
+            How fast are the DMs sent?
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div class="faq-a">
+            <div class="faq-a-inner">
+              Usually within 1-5 seconds of the user posting a comment. During extremely viral spikes, our queue system ensures messages are delivered steadily without hitting rate limits.
+            </div>
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <button class="faq-q" onclick="toggleFaq(this)">
+            What happens if they comment twice?
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div class="faq-a">
+            <div class="faq-a-inner">
+              Our duplicate protection system logs every user we interact with. If they comment the exact keyword again on the same post, we gracefully ignore it so they aren't spammed.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 LinkPlease. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    function toggleFaq(btn) {
+      const item = btn.closest('.faq-item');
+      const answer = item.querySelector('.faq-a');
+      const isActive = item.classList.contains('active');
+      
+      document.querySelectorAll('.faq-item').forEach(i => {
+        i.classList.remove('active');
+        i.querySelector('.faq-a').style.maxHeight = null;
+      });
+      
+      if (!isActive) {
+        item.classList.add('active');
+        answer.style.maxHeight = answer.scrollHeight + "px";
+      }
+    }
+
+    // Simple intersection observer for counter animation
+    const counters = document.querySelectorAll('.stat-counter');
+    let hasAnimated = false;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !hasAnimated) {
+        hasAnimated = true;
+        counters.forEach(counter => {
+          const target = +counter.getAttribute('data-target');
+          const suffix = counter.getAttribute('data-suffix') || '';
+          let count = 0;
+          const inc = target / 40;
+          
+          function updateCount() {
+            count += inc;
+            if (count < target) {
+              counter.innerText = Math.ceil(count) + suffix;
+              requestAnimationFrame(updateCount);
+            } else {
+              counter.innerText = target + suffix;
+            }
+          }
+          updateCount();
+        });
+      }
+    }, { threshold: 0.5 });
+    
+    if(document.querySelector('.stats-strip')) {
+      observer.observe(document.querySelector('.stats-strip'));
+    }
+  </script>
+</body>
+</html>
