@@ -181,13 +181,13 @@ async def stats():
 LANDING_HTML_PATH = os.path.join(os.path.dirname(__file__), "static", "landing.html")
 INDEX_HTML_PATH = os.path.join(os.path.dirname(__file__), "static", "index.html")
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def landing():
     """Serve marketing landing page."""
     with open(LANDING_HTML_PATH, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.api_route("/dashboard", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def dashboard():
     """Serve single-page dashboard UI."""
     with open(INDEX_HTML_PATH, "r", encoding="utf-8") as f:
